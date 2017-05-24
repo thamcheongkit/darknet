@@ -218,7 +218,7 @@ void validate_coco(char *cfgfile, char *weightfile)
             free_image(val_resized[t]);
         }
     }
-    fseek(fp, -2, SEEK_CUR); 
+    fseek(fp, -2, SEEK_CUR);
     fprintf(fp, "\n]\n");
     fclose(fp);
 
@@ -348,7 +348,7 @@ void test_coco(char *cfgfile, char *weightfile, char *filename, float thresh)
         printf("%s: Predicted in %f seconds.\n", input, sec(clock()-time));
         get_detection_boxes(l, 1, 1, thresh, probs, boxes, 0);
         if (nms) do_nms_sort(boxes, probs, l.side*l.side*l.n, l.classes, nms);
-        draw_detections(im, l.side*l.side*l.n, thresh, boxes, probs, coco_classes, alphabet, 80);
+        draw_detections(im, l.side*l.side*l.n, thresh, boxes, probs, coco_classes, alphabet, 80, "");
         save_image(im, "prediction");
         show_image(im, "predictions");
         free_image(im);

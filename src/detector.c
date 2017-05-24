@@ -8,6 +8,14 @@
 #include "option_list.h"
 #include "blas.h"
 
+#include <setjmp.h>
+
+#define TRY do{ jmp_buf ex_buf__; if( !setjmp(ex_buf__) ){
+#define CATCH } else {
+#define ETRY } }while(0)
+#define THROW longjmp(ex_buf__, 1)
+
+
 static int coco_ids[] = {1,2,3,4,5,6,7,8,9,10,11,13,14,15,16,17,18,19,20,21,22,23,24,25,27,28,31,32,33,34,35,36,37,38,39,40,41,42,43,44,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,67,70,72,73,74,75,76,77,78,79,80,81,82,84,85,86,87,88,89,90};
 
 void train_detector(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear)
@@ -372,7 +380,7 @@ void validate_detector_flip(char *datacfg, char *cfgfile, char *weightfile, char
         if(fps) fclose(fps[j]);
     }
     if(coco){
-        fseek(fp, -2, SEEK_CUR); 
+        fseek(fp, -2, SEEK_CUR);
         fprintf(fp, "\n]\n");
         fclose(fp);
     }
@@ -503,7 +511,7 @@ void validate_detector(char *datacfg, char *cfgfile, char *weightfile, char *out
         if(fps) fclose(fps[j]);
     }
     if(coco){
-        fseek(fp, -2, SEEK_CUR); 
+        fseek(fp, -2, SEEK_CUR);
         fprintf(fp, "\n]\n");
         fclose(fp);
     }
@@ -616,46 +624,86 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
             if(!input) return;
             strtok(input, "\n");
         }
-        image im = load_image_color(input,0,0);
-        image sized = letterbox_image(im, net.w, net.h);
-        //image sized = resize_image(im, net.w, net.h);
-        //image sized2 = resize_max(im, net.w);
-        //image sized = crop_image(sized2, -((net.w - sized2.w)/2), -((net.h - sized2.h)/2), net.w, net.h);
-        //resize_network(&net, sized.w, sized.h);
-        layer l = net.layers[net.n-1];
 
-        box *boxes = calloc(l.w*l.h*l.n, sizeof(box));
-        float **probs = calloc(l.w*l.h*l.n, sizeof(float *));
-        for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = calloc(l.classes + 1, sizeof(float *));
+        // char *numberArray[99999];
+        // FILE *pFile = fopen(input, "r");
+        // fscanf(pFile, "%1d", &numberArray[i]);
+        // for (int i=0; i<99999; i++) {
+        //     printf("%s", numberArray[i]);
+        // }
 
-        float *X = sized.data;
-        time=clock();
-        network_predict(net, X);
-        printf("%s: Predicted in %f seconds.\n", input, sec(clock()-time));
-        get_region_boxes(l, im.w, im.h, net.w, net.h, thresh, probs, boxes, 0, 0, hier_thresh, 1);
-        if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
-        //else if (nms) do_nms_sort(boxes, probs, l.w*l.h*l.n, l.classes, nms);
-        draw_detections(im, l.w*l.h*l.n, thresh, boxes, probs, names, alphabet, l.classes);
-        if(outfile){
-            save_image(im, outfile);
-        }
-        else{
-            save_image(im, "predictions");
-#ifdef OPENCV
-            cvNamedWindow("predictions", CV_WINDOW_NORMAL); 
-            if(fullscreen){
-                cvSetWindowProperty("predictions", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+        FILE *f = fopen(input, "rb");
+        fseek(f, 0, SEEK_END);
+        long fsize = ftell(f);
+        fseek(f, 0, SEEK_SET);  //same as rewind(f);
+
+        char *string = malloc(fsize + 1);
+        fread(string, fsize, 1, f);
+        fclose(f);
+
+        // printf("%s", string);
+
+        char *splitted = NULL;
+        splitted = strtok(string, "\r\n");
+        static jmp_buf s_jumpBuffer;
+        while (splitted != NULL) {
+            // do stuff here
+
+            TRY {
+                printf("%s\n", splitted);
+                splitted = strtok(NULL, "\r\n");
+
+                image im = load_image_color(splitted,0,0);
+                if (NULL == im.h) {
+                  continue;
+                }
+                image sized = letterbox_image(im, net.w, net.h);
+                //image sized = resize_image(im, net.w, net.h);
+                //image sized2 = resize_max(im, net.w);
+                //image sized = crop_image(sized2, -((net.w - sized2.w)/2), -((net.h - sized2.h)/2), net.w, net.h);
+                //resize_network(&net, sized.w, sized.h);
+                layer l = net.layers[net.n-1];
+
+                box *boxes = calloc(l.w*l.h*l.n, sizeof(box));
+                float **probs = calloc(l.w*l.h*l.n, sizeof(float *));
+                for(j = 0; j < l.w*l.h*l.n; ++j) probs[j] = calloc(l.classes + 1, sizeof(float *));
+
+                float *X = sized.data;
+                time=clock();
+                network_predict(net, X);
+                printf("%s: Predicted in %f seconds.\n", splitted, sec(clock()-time));
+                get_region_boxes(l, im.w, im.h, net.w, net.h, thresh, probs, boxes, 0, 0, hier_thresh, 1);
+                if (nms) do_nms_obj(boxes, probs, l.w*l.h*l.n, l.classes, nms);
+                //else if (nms) do_nms_sort(boxes, probs, l.w*l.h*l.n, l.classes, nms);
+                draw_detections(im, l.w*l.h*l.n, thresh, boxes, probs, names, alphabet, l.classes, splitted);
+
+                free_image(im);
+                free_image(sized);
+                free(boxes);
+                free_ptrs((void **)probs, l.w*l.h*l.n);
+                THROW;
             }
-            show_image(im, "predictions");
-            cvWaitKey(0);
-            cvDestroyAllWindows();
-#endif
-        }
+            CATCH {
 
-        free_image(im);
-        free_image(sized);
-        free(boxes);
-        free_ptrs((void **)probs, l.w*l.h*l.n);
+            }
+            ETRY;
+        }
+//         if(outfile){
+//             save_image(im, outfile);
+//         }
+//         else{
+//             save_image(im, "predictions");
+// #ifdef OPENCV
+//             cvNamedWindow("predictions", CV_WINDOW_NORMAL);
+//             if(fullscreen){
+//                 cvSetWindowProperty("predictions", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+//             }
+//             show_image(im, "predictions");
+//             cvWaitKey(0);
+//             cvDestroyAllWindows();
+// #endif
+//         }
+
         if (filename) break;
     }
 }

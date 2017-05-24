@@ -42,4 +42,5 @@ Enter Image Path: <enter_your_file_path eg. images.txt>
 
 ### How to read:
 ```/photos/3bb1a3475a739ca9a6ec249225d274c672ce67fc.jpg 54 248 98 427```
+
 ```<image_path> <left> <right> <top> <bottom>```
